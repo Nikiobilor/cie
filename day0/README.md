@@ -14,8 +14,77 @@ If you rebuild a fresh Ubuntu install from scratch every session, most of your t
 **1. Download Ubuntu Server 24.04 LTS**
 Get the ISO from ubuntu.com/download/server. Note the path you saved it to.
 
+Step 1 — Install VirtualBox
+Download
+
+Go to the official site:
+
+VirtualBox Downloads
+
+Download:
+
+Windows hosts installer
+
+VirtualBox Extension Pack (same version as VirtualBox)
+
+Install
+
+Run the installer.
+
+Keep the default options.
+
+Allow any Windows network driver prompts.
+
+After installation, double-click the Extension Pack file to install it.
+
+Verify
+
+Open PowerShell and run:
+
+VBoxManage --version
+
+You should see a version number such as 7.1.x.
+
+If you get “VBoxManage is not recognized”, use the full path:
+
+"C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" --version
+Step 2 — Download Ubuntu Server 24.04 LTS
+
+Open:
+
+Ubuntu Server download
+
+Download Ubuntu Server 24.04 LTS (64-bit).
+
+Save it somewhere easy, for example:
+
+C:\ISO\ubuntu-24.04-live-server-amd64.iso
+
+Create the folder C:\ISO first if it doesn’t exist.
+
+Step 3 — Create a lab folder
+
+Create a folder where VirtualBox will store the VM disk:
+
+mkdir C:\vbox-labs
+
+Move into it:
+
+cd C:\vbox-labs
+
+Check where you are:
+
+pwd
+
+You should see:
+
+
+cd C:\vbox-labs
 **2. Create the base VM (run in PowerShell/cmd, from your VirtualBox install folder or with it on PATH)**
 ```
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files\Oracle\VirtualBox", "User")
+VBoxManage --version
+
 VBoxManage createvm --name "base-vm" --ostype Ubuntu_64 --register
 VBoxManage modifyvm "base-vm" --memory 1024 --cpus 1
 VBoxManage createhd --filename "base-vm.vdi" --size 8192

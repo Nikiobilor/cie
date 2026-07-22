@@ -19,35 +19,39 @@ Today you'll only touch the VM side, so you can *feel* the weight of it before D
 
 ## Hands-On Lab
 
-**1. Clone and boot today's VM from your Day 0 base image**
+**1. Clone and start today's VM from your Day 0 base image**
 ```
 VBoxManage clonevm "base-vm" --name "day1-vm" --register
 VBoxManage startvm "day1-vm" --type headless
 ```
-Notice this takes seconds — that's the payoff of Day 0's one-time setup.
+Notice the boot itself takes seconds — that's the payoff of Day 0's one-time setup.
 
-**2. SSH in**
+**2. Give it its own forwarded port**
 
-Clones inherit the base VM's port-forward rule, which will collide if `base-vm` is also running. Give this clone its own forwarded port first:
+Clones inherit `base-vm`'s NAT rule, which is already named `"ssh"` — adding another rule with that same name fails even on a different port, because VirtualBox matches rules by name, not port number. Give each day's rule its own name instead:
 ```
-VBoxManage modifyvm "day1-vm" --natpf1 "ssh,tcp,,2201,,22"
+VBoxManage controlvm "day1-vm" natpf1 "day1ssh,tcp,,2201,,22"
+```
+
+**3. SSH in**
+```
 ssh labuser@127.0.0.1 -p 2201
 ```
 
-**3. Confirm it has its own kernel**
+**4. Confirm it has its own kernel**
 ```
 uname -r
 ```
 This is running a separate kernel from your host machine — proof it's a real, isolated OS, not a shared process.
 
-**4. Check its footprint**
+**5. Check its footprint**
 ```
 free -h
 df -h
 ```
 Note the disk usage. Write this number down — Day 2's LXD container will do a similar job at a fraction of this size, and that gap is the whole point of hyper-dense virtualization.
 
-**5. Clean up**
+**6. Clean up**
 ```
 exit
 VBoxManage controlvm "day1-vm" poweroff
