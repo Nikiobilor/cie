@@ -21,6 +21,7 @@ Today you'll only touch the VM side, so you can *feel* the weight of it before D
 
 **1. Clone and start today's VM from your Day 0 base image**
 ```
+cd C:\vbox-labs
 VBoxManage clonevm "base-vm" --name "day1-vm" --register
 VBoxManage startvm "day1-vm" --type headless
 ```
