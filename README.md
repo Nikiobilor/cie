@@ -27,8 +27,8 @@ Every day is one sitting, ~45–60 min:
 <summary><strong>Week 1 — Virtualization Foundations (Days 1–5)</strong></summary>
 
 - [x] Day 1: VM vs. container — why LXD is denser than VMware
-- [ ] Day 2: Install LXD, launch first container, compare footprint to Day 1
-- [ ] Day 3: LXD networking basics (bridges, profiles)
+- [x] Day 2: Install LXD, launch first container, compare footprint to Day 1
+- [x] Day 3: LXD networking basics (bridges, profiles)
 - [ ] Day 4: LXD storage pools — how a container's disk actually works
 - [ ] Day 5: Recap + build: multiple containers on one LXD host
 
