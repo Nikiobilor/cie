@@ -21,40 +21,75 @@ If this feels like less new information than earlier in the week, that's intenti
 
 ## Hands-On Lab
 
-**1. Clone, start, and connect**
+**1. Clone, then resize the disk before you boot it**
+
+Two containers, plus nginx and python3 installs, plus a `dir`-backend snapshot that needs room for a full extra copy of `app`, don't comfortably fit in the 8GB Day 0 built `base-vm` with. Resize the clone's disk now, while it's still powered off, so today's lab doesn't run out of space partway through:
 ```
-cd C:\vbox-labs
+C:\vbox-labs\
 VBoxManage clonevm "base-vm" --name "day5-vm" --register
+VBoxManage list hdds
+```
+Find the entry whose `Location` contains `day5-vm.vdi`, and copy its path or UUID.
+
+```
+VBoxManage modifymedium disk "<path or UUID you just copied>" --resize 20480
+```
+
+That grows the virtual disk to 20GB. The VM's OS doesn't know that happened yet, that comes next.
+
+**2. Start, connect, and grow the filesystem into the new space**
+```
 VBoxManage startvm "day5-vm" --type headless
 VBoxManage controlvm "day5-vm" natpf1 "day5ssh,tcp,,2205,,22"
 ```
 ```
 ssh labuser@127.0.0.1 -p 2205
 ```
+```
+sudo growpart /dev/sda 2
+sudo resize2fs /dev/sda2
+df -h
+```
+Resizing the `.vdi` only grew the container the disk lives in  `growpart` extends the partition to fill it, and `resize2fs` extends the filesystem to fill the partition. `df -h` should now show close to 20G available before you continue.
 
-**2. Install LXD**
+**3. Install LXD**
 ```
 sudo snap install lxd
 sudo lxd init --auto
 ```
 
-**3. Launch two containers**
+**4. Launch two containers**
 ```
 lxc launch ubuntu:24.04 app
 lxc launch ubuntu:24.04 web
 ```
 `app` will be your backend. `web` will front it.
 
-**4. Give `app` something to serve**
+**5. Give `app` something to serve — as a real systemd service, not a backgrounded shell command**
 ```
 lxc exec app -- bash -c "apt-get update -y && apt-get install -y python3"
 lxc exec app -- bash -c "echo 'Hello from the app container' > /root/index.html"
-lxc exec app -- bash -c "cd /root && nohup python3 -m http.server 8000 &> /var/log/http.log & disown"
+lxc exec app -- bash -c "cat > /etc/systemd/system/simplehttp.service << 'EOF'
+[Unit]
+Description=Simple HTTP server for the Day 5 lab
+After=network.target
 
-lxc exec app -- bash -c "cd /root && nohup python3 -m http.server 8000 < /dev/null &> /var/log/http.log & disown"
+[Service]
+WorkingDirectory=/root
+ExecStart=/usr/bin/python3 -m http.server 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF"
+lxc exec app -- systemctl daemon-reload
+lxc exec app -- systemctl enable --now simplehttp
 ```
+`nohup ... & disown` looks like it should detach a process from the terminal that launched it, but `lxc exec` tracks everything spawned during that call in its own cgroup and can tear it down when the exec session ends regardless. Even `setsid`, which puts a process in a brand new session, doesn't reliably survive that. The container already ships a real init system, systemd, as PID 1 — handing the process to it with a proper unit file sidesteps the problem entirely, because the process was never really "inside" the exec call to begin with.
 
-**5. Install nginx on `web` and point it at `app` by name**
+`enable`, not just `start`, matters here too: it registers the service to come back on its own after a reboot. A transient unit made with `systemd-run` would run fine right now, but silently not exist anymore the next time this VM restarts, which is exactly the kind of gap that shows up two steps later and looks like a completely different bug.
+
+**6. Install nginx on `web` and point it at `app` by name**
 ```
 lxc exec web -- bash -c "apt-get update -y && apt-get install -y nginx"
 lxc exec web -- bash -c "cat > /etc/nginx/sites-available/default << 'EOF'
@@ -115,6 +150,37 @@ VBoxManage unregistervm "day5-vm" --delete
 ## Retention Check
 
 This week, four things were configured for you without asking: which kernel a container uses, which network it joins, how it gets discovered by name, and how its storage is backed. If you'd built this same two-container setup on plain VMs instead of containers, which of those four would you have had to configure by hand yourself? Write down all four before moving on.
+
+Let's compare the four items:
+
+Configured automatically by LXD	If using plain VMs...
+1. Kernel	You must install and boot a separate kernel for each VM. Each VM has its own operating system and kernel.
+2. Network	You must create and configure the network yourself. For example, set up VirtualBox NAT, Bridged, or Host-Only networking, configure interfaces, IP addresses, etc.
+3. Service discovery (DNS)	You must configure it yourself. VMs don't automatically resolve each other's names. You'd need to use static IPs, edit /etc/hosts, or run a DNS server.
+4. Storage backend	You choose and manage it yourself. You decide the virtual disk format (VDI, VMDK, QCOW2, etc.) and how snapshots are implemented by the hypervisor.
+So the answer is:
+
+If I built this on plain VMs instead of LXD containers, I would have had to configure by hand:
+
+A kernel for each VM (by installing an operating system).
+Networking so the VMs could communicate.
+Name resolution (DNS or /etc/hosts) so one VM could find the other by name.
+The storage backend and snapshot mechanism used by the virtual disks.
+The key lesson
+
+LXD abstracts away much of the infrastructure work. When you launched:
+
+lxc launch ubuntu:24.04 app
+lxc launch ubuntu:24.04 web
+
+LXD automatically:
+
+Shared the host's kernel.
+Connected both containers to the default bridge.
+Registered their names (app and web) with its built-in DNS.
+Placed their files on the default storage backend (dir in your lab).
+
+With plain VMs, none of those conveniences exist by default. You have to make each of those decisions and configure them yourself, which is why containers are much lighter and faster to deploy.
 
 ## Up Next — Week 2, Day 6
 
